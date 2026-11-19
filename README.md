@@ -2,6 +2,14 @@
 
 FinOps AI é uma aplicação de monitoramento financeiro construída sobre **50.000 transações inteiramente sintéticas** de 2025. O projeto reúne exploração de movimentações, detecção de grupos atípicos por conta, canal e dia, investigação sob demanda e notificações simuladas. A versão local permite ações administrativas; a demonstração pública é somente de leitura. Um alerta é um sinal para investigar, não uma classificação de fraude nem uma movimentação financeira.
 
+## Demonstração online
+
+**[Acessar o FinOps AI](https://finops-ai-monitor.netlify.app/)** · [Documentação interativa da API](https://finops-ai-api.onrender.com/docs) · [Health check da API](https://finops-ai-api.onrender.com/api/health)
+
+A aplicação está publicada em uma arquitetura separada: **Netlify** hospeda o frontend React/Vite, **Render Free** executa a API FastAPI em um contêiner Docker e **Neon Free** armazena os dados sintéticos em PostgreSQL 17. A base hospedada foi verificada com **50.000 transações**, **602 candidatos da abordagem combinada**, oito contas, quatro canais e uma execução do pipeline. A API respondeu com `status=ok`, `synthetic=true`, `public_demo=true`, `gemini_available=false` e `notification_mode=simulated`; a navegação pelas cinco páginas foi conferida após a publicação.
+
+O ambiente online é uma **demonstração somente de leitura**. Não executa investigações por Gemini nem envia notificações reais; a integração Gemini e o workflow n8n foram validados separadamente no ambiente local. Como o Render utiliza o plano gratuito, a primeira requisição após um período de inatividade pode demorar enquanto o serviço é reativado.
+
 ## Prévia do dashboard
 
 ![Dashboard do FinOps AI com indicadores, comparação dos detectores e fluxo financeiro](docs/images/01-dashboard.png)
@@ -12,17 +20,17 @@ A interface usa azul-marinho no fundo, na navegação lateral e nas superfícies
 
 - **Frontend:** React 19, TypeScript, Vite 7 e Tailwind CSS 4; gráficos em SVG e testes com Vitest e Playwright.
 - **API:** Python 3.14, FastAPI, Pydantic e SQLAlchemy; testes com pytest e Ruff.
-- **Dados:** SQLite no início rápido local, PostgreSQL no ambiente Docker e migrations Alembic.
+- **Dados:** SQLite no início rápido local, PostgreSQL no Docker e PostgreSQL 17 gerenciado no Neon para a demonstração pública; migrations Alembic.
 - **Detecção:** Isolation Forest e regras estatísticas, avaliados separadamente e em união.
 - **Integrações opcionais:** Gemini API para investigação sob demanda e n8n Community para automação local. O modo padrão de notificação é `simulated`.
 
 ## Arquitetura da aplicação
 
-O frontend em `frontend/` consulta a API FastAPI em `backend/`. Na execução local integrada, a aplicação compilada é servida pelo próprio FastAPI; no desenvolvimento, o Vite encaminha `/api` para a porta 8000. A configuração de publicação separa o frontend estático no Netlify e a API no Render. `database/` guarda as migrations e o SQLite local ignorado pelo Git. `automation/` contém o workflow n8n exportável. A API usa filtros tipados, paginação e cabeçalhos de segurança.
+O frontend em `frontend/` consulta a API FastAPI em `backend/`. Na execução local integrada, a aplicação compilada é servida pelo próprio FastAPI; no desenvolvimento, o Vite encaminha `/api` para a porta 8000. Na versão online, o frontend estático é hospedado no Netlify, a API FastAPI é executada no Render Free com Docker e o banco PostgreSQL 17 fica no Neon Free. O Netlify chama a API pela variável pública `VITE_API_BASE_URL`; o Render mantém `DATABASE_URL` como segredo no backend e restringe `CORS_ORIGIN` ao domínio HTTPS `https://finops-ai-monitor.netlify.app`. `database/` guarda as migrations e o SQLite local ignorado pelo Git. `automation/` contém o workflow n8n exportável. A API usa filtros tipados, paginação e cabeçalhos de segurança.
 
 No modo local, gravações exigem `X-Admin-Key`. Com `PUBLIC_DEMO=true`, as rotas administrativas e a consulta de alertas pendentes do n8n não são registradas. O navegador recebe somente dados sintéticos e pode solicitar uma prévia de investigação por regras, sem gravação nem chamada externa. Esse modo é uma vitrine de leitura; não substitui autenticação por usuário em um produto operacional. Use um worker no modo local.
 
-O PostgreSQL usa a mesma migration Alembic do SQLite. Para configurá-lo fora do Compose, defina `DATABASE_URL=postgresql+psycopg://usuario:senha@host:5432/banco` no `.env`, crie um banco vazio e execute `.\.venv\Scripts\python.exe -m backend.app.cli init`. Serviços gerenciados podem exigir TLS (`sslmode=require`); conexão externa e políticas do provedor ainda não foram testadas aqui. A URL do banco não vai para o frontend.
+O PostgreSQL usa a mesma migration Alembic do SQLite. Para configurá-lo fora do Compose, defina `DATABASE_URL=postgresql+psycopg://usuario:senha@host:5432/banco` no `.env`, crie um banco vazio e execute `.\.venv\Scripts\python.exe -m backend.app.cli init`. Na implantação no Neon, a conexão externa com TLS (`sslmode=require`) foi utilizada e a carga sintética foi conferida diretamente no banco. A URL do banco não vai para o frontend.
 
 ## Pipeline e dados sintéticos
 
@@ -131,7 +139,7 @@ Abra <http://127.0.0.1:8000>; a documentação OpenAPI está em <http://127.0.0.
 
 Se `py -3.14` não estiver disponível, passe `-PythonPath 'C:\caminho\para\python.exe'` ao primeiro comando. Para executar frontend e backend separadamente, inicie `uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000` pelo ambiente virtual da raiz e `npm.cmd run dev` em `frontend/`. O Vite encaminha `/api` à porta 8000.
 
-Para uma futura demonstração online, o [guia de publicação](docs/public-demo.md) descreve frontend no Netlify, API no Render Free e PostgreSQL no Neon Free. `VITE_API_BASE_URL` aponta o navegador para o Render; `CORS_ORIGIN` autoriza somente o domínio HTTPS configurado no Netlify. `PUBLIC_DEMO=true` mantém somente leitura e prévia por regras. **Nenhum deploy foi realizado nesta etapa.** Não coloque chaves, credenciais ou dados reais no ambiente público.
+A [demonstração online](https://finops-ai-monitor.netlify.app/) está publicada. O [guia de publicação e reprodução](docs/public-demo.md) documenta frontend no Netlify, API no Render Free e PostgreSQL no Neon Free. `VITE_API_BASE_URL` aponta o navegador para a API e `CORS_ORIGIN` autoriza somente o domínio HTTPS configurado. `PUBLIC_DEMO=true` mantém somente leitura e prévia por regras. Não coloque chaves, credenciais ou dados reais no ambiente público.
 
 ## Testes, limitações e próximos passos
 
@@ -154,10 +162,12 @@ O teste de navegador usa cópia descartável do SQLite, servidor local na porta 
 
 Na validação de 18/11/2026, passaram **52 testes pytest**, **7 testes Vitest**, typecheck, ESLint, Ruff, build e seis fluxos Playwright (quatro locais e dois públicos). Docker Compose iniciou PostgreSQL, FastAPI e n8n. O workflow foi importado e executado três vezes no n8n, com 141 notificações simuladas, 141 alertas distintos, 141 tentativas e zero falhas de entrega. Uma tentativa inicial do CLI falhou por conflito na porta interna do task broker antes de chamar o backend; a execução com portas internas exclusivas funcionou. O Chrome confirmou registros na página de Automações e resumo no dashboard sem erro de console. O agendamento não foi ativado.
 
-Depois do redesign, o frontend passou novamente por typecheck, ESLint, 7 testes Vitest e build. O Playwright gerou as cinco capturas públicas reais e verificou as páginas em larguras de 1440, 1366, 768 e 390 px, sem erro de console ou overflow horizontal da página. A validação ainda não inclui aparelho móvel físico, SMTP real ou PostgreSQL gerenciado.
+Depois do redesign, o frontend passou novamente por typecheck, ESLint, 7 testes Vitest e build. O Playwright gerou as cinco capturas públicas reais e verificou as páginas em larguras de 1440, 1366, 768 e 390 px, sem erro de console ou overflow horizontal da página. Essa rodada não incluiu aparelho móvel físico, SMTP real ou PostgreSQL gerenciado; a conexão gerenciada foi validada posteriormente durante a implantação no Neon.
 
-Na preparação para hospedagem separada em 19/11/2026, passaram **57 testes pytest**, **8 testes Vitest**, Ruff, typecheck, ESLint, build e dois fluxos Playwright do modo público (desktop e mobile). O build de exemplo incorporou `VITE_API_BASE_URL` sem credenciais; a imagem `Dockerfile.render` compilou e, em teste local com banco descartável, respondeu ao health check com `PUBLIC_DEMO=true`, CORS restrito e sem rota administrativa. A conexão real ao Neon e a partida no Render ainda não foram executadas.
+Na preparação para hospedagem separada em 19/11/2026, passaram **57 testes pytest**, **8 testes Vitest**, Ruff, typecheck, ESLint, build e dois fluxos Playwright do modo público (desktop e mobile). O build de exemplo incorporou `VITE_API_BASE_URL` sem credenciais; a imagem `Dockerfile.render` compilou e, em teste local com banco descartável, respondeu ao health check com `PUBLIC_DEMO=true`, CORS restrito e sem rota administrativa. A conexão real ao Neon e a partida no Render eram pendências dessa etapa e foram verificadas posteriormente durante a publicação.
 
 Na auditoria anterior, `npm audit --omit=dev` e `pip-audit` sobre `backend/requirements.lock.txt` retornaram zero vulnerabilidades. O audit completo do npm apontou uma vulnerabilidade alta de ReDoS em `picomatch` nas ferramentas de desenvolvimento; ainda não havia correção na [advisory consultada](https://github.com/advisories/GHSA-fc5q-39xc-vjpf). O build estático não inclui essa dependência. Verifique um patch antes de atualizar ou expor ferramentas de build a padrões glob de origem não confiável.
 
-O dataset é demonstrativo: não contém dados financeiros reais e não oferece decisão automática ou aconselhamento financeiro. O corte temporal e as regras foram escolhidos para a simulação; métricas podem mudar com seed, algoritmo ou dependências. Os próximos passos dependem de um ambiente de hospedagem configurado e de validação em dispositivo físico, sem expor operações administrativas.
+Em 19/11/2026, a implantação no Neon foi verificada com 13 tabelas, 50.000 transações, 602 candidatos da abordagem combinada e uma execução do pipeline; o Render iniciou a API com sucesso e o endpoint `/api/health` retornou a configuração pública esperada. O frontend foi publicado no Netlify e as cinco páginas foram conferidas na demonstração online. Esses resultados são verificações de implantação, não uma nova bateria de testes automatizados em produção.
+
+O dataset é demonstrativo: não contém dados financeiros reais e não oferece decisão automática ou aconselhamento financeiro. O corte temporal e as regras foram escolhidos para a simulação; métricas podem mudar com seed, algoritmo ou dependências. Permanecem como próximos passos a verificação em aparelho físico e o acompanhamento da disponibilidade e dos limites dos planos gratuitos.
