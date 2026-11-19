@@ -2,10 +2,18 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AnomalyTable, CashflowChart, Pagination, Status } from './components'
-import { query, request } from './api'
+import { apiUrl, query, request } from './api'
 import type { Anomaly } from './types'
 
 describe('API and interface behavior', () => {
+  it('uses the configured API origin without putting credentials in the client', () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://finops-api.onrender.com/')
+    expect(apiUrl('/api/health')).toBe('https://finops-api.onrender.com/api/health')
+    expect(apiUrl('/docs')).toBe('https://finops-api.onrender.com/docs')
+    vi.unstubAllEnvs()
+    expect(apiUrl('/api/health')).toBe('/api/health')
+  })
+
   it('encodes filters and excludes empty values', () => {
     expect(query({ search: 'A & B', page: 2, status: '' })).toBe('search=A+%26+B&page=2')
   })

@@ -18,7 +18,7 @@ A interface usa azul-marinho no fundo, na navegação lateral e nas superfícies
 
 ## Arquitetura da aplicação
 
-O frontend em `frontend/` consulta a API FastAPI em `backend/`. A aplicação compilada é servida pelo próprio FastAPI; no desenvolvimento, o Vite encaminha `/api` para a porta 8000. `database/` guarda as migrations e o SQLite local ignorado pelo Git. `automation/` contém o workflow n8n exportável. A API usa filtros tipados, paginação e cabeçalhos de segurança.
+O frontend em `frontend/` consulta a API FastAPI em `backend/`. Na execução local integrada, a aplicação compilada é servida pelo próprio FastAPI; no desenvolvimento, o Vite encaminha `/api` para a porta 8000. A configuração de publicação separa o frontend estático no Netlify e a API no Render. `database/` guarda as migrations e o SQLite local ignorado pelo Git. `automation/` contém o workflow n8n exportável. A API usa filtros tipados, paginação e cabeçalhos de segurança.
 
 No modo local, gravações exigem `X-Admin-Key`. Com `PUBLIC_DEMO=true`, as rotas administrativas e a consulta de alertas pendentes do n8n não são registradas. O navegador recebe somente dados sintéticos e pode solicitar uma prévia de investigação por regras, sem gravação nem chamada externa. Esse modo é uma vitrine de leitura; não substitui autenticação por usuário em um produto operacional. Use um worker no modo local.
 
@@ -111,7 +111,9 @@ automation/           workflow n8n exportável
 docs/                 guias e capturas reais das cinco telas
 scripts/              preparação, inicialização e verificação de navegador
 docker-compose.yml    serviços locais PostgreSQL, app e n8n
-Dockerfile            imagem da aplicação integrada
+Dockerfile            imagem da aplicação integrada local
+Dockerfile.render     imagem somente da API para Render
+netlify.toml          build e roteamento SPA do Netlify
 ```
 
 O SQLite local, `.env`, logs, capturas temporárias e artefatos de build são ignorados pelo Git.
@@ -129,7 +131,7 @@ Abra <http://127.0.0.1:8000>; a documentação OpenAPI está em <http://127.0.0.
 
 Se `py -3.14` não estiver disponível, passe `-PythonPath 'C:\caminho\para\python.exe'` ao primeiro comando. Para executar frontend e backend separadamente, inicie `uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000` pelo ambiente virtual da raiz e `npm.cmd run dev` em `frontend/`. O Vite encaminha `/api` à porta 8000.
 
-Para uma futura demonstração online, `PUBLIC_DEMO=true` mantém somente leitura e prévia por regras. A estratégia gratuita proposta é um serviço Docker no Render com frontend e API no mesmo domínio e PostgreSQL Free no Neon. **Nenhum deploy foi realizado nesta etapa.** Veja o [guia de publicação futura](docs/public-demo.md), incluindo configuração segura e limites dos planos gratuitos. Não coloque chaves, credenciais ou dados reais no ambiente público.
+Para uma futura demonstração online, o [guia de publicação](docs/public-demo.md) descreve frontend no Netlify, API no Render Free e PostgreSQL no Neon Free. `VITE_API_BASE_URL` aponta o navegador para o Render; `CORS_ORIGIN` autoriza somente o domínio HTTPS configurado no Netlify. `PUBLIC_DEMO=true` mantém somente leitura e prévia por regras. **Nenhum deploy foi realizado nesta etapa.** Não coloque chaves, credenciais ou dados reais no ambiente público.
 
 ## Testes, limitações e próximos passos
 
@@ -153,6 +155,8 @@ O teste de navegador usa cópia descartável do SQLite, servidor local na porta 
 Na validação de 18/11/2026, passaram **52 testes pytest**, **7 testes Vitest**, typecheck, ESLint, Ruff, build e seis fluxos Playwright (quatro locais e dois públicos). Docker Compose iniciou PostgreSQL, FastAPI e n8n. O workflow foi importado e executado três vezes no n8n, com 141 notificações simuladas, 141 alertas distintos, 141 tentativas e zero falhas de entrega. Uma tentativa inicial do CLI falhou por conflito na porta interna do task broker antes de chamar o backend; a execução com portas internas exclusivas funcionou. O Chrome confirmou registros na página de Automações e resumo no dashboard sem erro de console. O agendamento não foi ativado.
 
 Depois do redesign, o frontend passou novamente por typecheck, ESLint, 7 testes Vitest e build. O Playwright gerou as cinco capturas públicas reais e verificou as páginas em larguras de 1440, 1366, 768 e 390 px, sem erro de console ou overflow horizontal da página. A validação ainda não inclui aparelho móvel físico, SMTP real ou PostgreSQL gerenciado.
+
+Na preparação para hospedagem separada em 19/11/2026, passaram **57 testes pytest**, **8 testes Vitest**, Ruff, typecheck, ESLint, build e dois fluxos Playwright do modo público (desktop e mobile). O build de exemplo incorporou `VITE_API_BASE_URL` sem credenciais; a imagem `Dockerfile.render` compilou e, em teste local com banco descartável, respondeu ao health check com `PUBLIC_DEMO=true`, CORS restrito e sem rota administrativa. A conexão real ao Neon e a partida no Render ainda não foram executadas.
 
 Na auditoria anterior, `npm audit --omit=dev` e `pip-audit` sobre `backend/requirements.lock.txt` retornaram zero vulnerabilidades. O audit completo do npm apontou uma vulnerabilidade alta de ReDoS em `picomatch` nas ferramentas de desenvolvimento; ainda não havia correção na [advisory consultada](https://github.com/advisories/GHSA-fc5q-39xc-vjpf). O build estático não inclui essa dependência. Verifique um patch antes de atualizar ou expor ferramentas de build a padrões glob de origem não confiável.
 

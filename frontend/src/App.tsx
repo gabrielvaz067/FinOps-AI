@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { post, query, useApi } from './api'
+import { apiUrl, post, query, useApi } from './api'
 import { Icon, Status } from './components'
 import { Dashboard, Transactions, Anomalies, Investigation, Automations } from './pages'
 import type { Filters, Health, Options, Page } from './types'
@@ -133,7 +133,7 @@ export default function App() {
             <strong>Dados sintéticos. Sempre.</strong>
             <p>Um laboratório para explorar sinais, sem movimentar dinheiro real.</p>
           </div>
-          <a className="docs-link" href="/docs" target="_blank" rel="noreferrer">
+          <a className="docs-link" href={apiUrl('/docs')} target="_blank" rel="noreferrer">
             Documentação da API <Icon name="arrow" size={16} />
           </a>
           <div className="sidebar-footer">

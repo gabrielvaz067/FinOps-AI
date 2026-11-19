@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
 
+export function apiUrl(path: string): string {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') ?? ''
+  return `${baseUrl}${path}`
+}
+
 export function query(values: Record<string, string | number | undefined>): string {
   const params = new URLSearchParams()
   Object.entries(values).forEach(([key, value]) => {
@@ -9,7 +14,7 @@ export function query(values: Record<string, string | number | undefined>): stri
 }
 
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, options)
+  const response = await fetch(apiUrl(`/api${path}`), options)
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null)
     const detail = body && typeof body === 'object' && 'detail' in body ? body.detail : null

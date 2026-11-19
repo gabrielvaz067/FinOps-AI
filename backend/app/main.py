@@ -9,6 +9,7 @@ from datetime import time as daytime
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -153,6 +154,14 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
             (time.monotonic() - started) * 1000,
         )
         return response
+
+    if settings.cors_origin:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[settings.cors_origin],
+            allow_methods=["GET"],
+            allow_headers=[],
+        )
 
     def db():
         with sessions() as session:

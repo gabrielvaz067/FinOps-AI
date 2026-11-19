@@ -155,6 +155,45 @@ def test_public_demo_rejects_external_integrations(seeded_engine):
         create_app(Settings(_env_file=None, public_demo=True, notification_mode="smtp"), seeded_engine)
 
 
+def test_public_demo_cors_allows_only_configured_origin_and_get(seeded_engine):
+    settings = Settings(
+        _env_file=None,
+        public_demo=True,
+        cors_origin="https://finops-demo.netlify.app",
+    )
+    with TestClient(create_app(settings, seeded_engine)) as demo:
+        allowed = demo.get("/api/health", headers={"Origin": settings.cors_origin})
+        assert allowed.headers["access-control-allow-origin"] == settings.cors_origin
+
+        denied = demo.get(
+            "/api/health", headers={"Origin": "https://finops-demo.netlify.app.attacker.example"}
+        )
+        assert "access-control-allow-origin" not in denied.headers
+
+        preflight = demo.options(
+            "/api/health",
+            headers={
+                "Origin": settings.cors_origin,
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        assert preflight.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://finops-demo.netlify.app",
+        "https://finops-demo.netlify.app/path",
+        "https://user:secret@finops-demo.netlify.app",
+        "https://*.netlify.app",
+    ],
+)
+def test_cors_origin_requires_exact_https_origin(origin):
+    with pytest.raises(ValueError):
+        Settings(_env_file=None, cors_origin=origin)
+
+
 @pytest.mark.parametrize(
     "path", ["/api/pipeline/run", "/api/automations/run", "/api/anomalies/1/investigate"]
 )
