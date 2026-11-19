@@ -189,6 +189,7 @@ export function CashflowChart({ data }: { data: SeriesPoint[] }) {
     ).format(new Date(`${key}${monthly ? '-01' : ''}T12:00:00Z`))
   return (
     <>
+      <div className="chart-scroll" role="region" aria-label="Gráfico de fluxo financeiro" tabIndex={0}>
       <svg
         className="cashflow-chart"
         viewBox="0 0 850 270"
@@ -202,7 +203,7 @@ export function CashflowChart({ data }: { data: SeriesPoint[] }) {
               y1={y(max * ratio)}
               x2="824"
               y2={y(max * ratio)}
-              stroke="#2c322b"
+              stroke="var(--border)"
               strokeDasharray="3 5"
             />
             <text x="65" y={y(max * ratio) + 4} textAnchor="end">
@@ -212,26 +213,26 @@ export function CashflowChart({ data }: { data: SeriesPoint[] }) {
         ))}
         <path
           d={`${line('inflow')} L ${x(points.length - 1)} 224 L 78 224 Z`}
-          fill="#c4ef6e"
+          fill="var(--accent)"
           fillOpacity=".045"
         />
         <path
           d={line('inflow')}
           fill="none"
-          stroke="#c4ef6e"
+          stroke="var(--accent)"
           strokeWidth="2.5"
           strokeLinejoin="round"
         />
         <path
           d={line('outflow')}
           fill="none"
-          stroke="#839cce"
+          stroke="var(--success)"
           strokeWidth="2"
           strokeLinejoin="round"
         />
         {points.map(([key, point], index) => (
           <g key={key}>
-            <circle cx={x(index)} cy={y(point.inflow)} r="3" fill="#c4ef6e">
+            <circle cx={x(index)} cy={y(point.inflow)} r="3" fill="var(--accent)">
               <title>
                 {label(key)}: entrada {compactMoney(point.inflow)}, saída{' '}
                 {compactMoney(point.outflow)}
@@ -245,6 +246,7 @@ export function CashflowChart({ data }: { data: SeriesPoint[] }) {
           </g>
         ))}
       </svg>
+      </div>
       <details className="chart-data">
         <summary>Consultar valores do gráfico</summary>
         <div

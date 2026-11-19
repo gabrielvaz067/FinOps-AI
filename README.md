@@ -1,96 +1,139 @@
 # FinOps AI
 
-Aplicação de monitoramento financeiro com dados **inteiramente sintéticos**. Gera 50.000 transações de 2025, detecta grupos atípicos por conta, canal e dia, apresenta evidências e registra investigações e notificações simuladas. Pode rodar localmente com ações administrativas ou em modo público somente de leitura. Anomalia é um sinal para investigar; o sistema não classifica fraude nem movimenta dinheiro.
+FinOps AI é uma aplicação de monitoramento financeiro construída sobre **50.000 transações inteiramente sintéticas** de 2025. O projeto reúne exploração de movimentações, detecção de grupos atípicos por conta, canal e dia, investigação sob demanda e notificações simuladas. A versão local permite ações administrativas; a demonstração pública é somente de leitura. Um alerta é um sinal para investigar, não uma classificação de fraude nem uma movimentação financeira.
 
-## Executar no Windows (PowerShell)
+## Prévia do dashboard
 
-Requisitos: Python 3.14, Node.js 24 e npm 11. O comando de preparação instala dependências no projeto, cria `.env` local com chaves aleatórias, aplica a migration, carrega a base uma vez, executa o pipeline e compila o frontend. A primeira preparação processa 50.000 transações e leva alguns minutos.
+![Dashboard do FinOps AI com indicadores, comparação dos detectores e fluxo financeiro](docs/images/01-dashboard.png)
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1
-```
+A interface usa azul-marinho no fundo, na navegação lateral e nas superfícies, com azul claro para ações e séries principais. Verde, âmbar e vermelho distinguem estados operacionais e prioridades. O layout mantém filtros globais, indicadores, gráficos e tabelas em grades que se adaptam ao espaço disponível.
 
-Abra <http://127.0.0.1:8000>. A API tem documentação OpenAPI em <http://127.0.0.1:8000/docs>. Para gerar análises, reexecutar o pipeline ou simular notificações, abra **Acesso administrativo** na interface e copie o valor de `FINOPS_ADMIN_KEY` do seu `.env` local. A interface mantém a chave apenas na memória da aba. Não compartilhe nem versione esse arquivo.
+## Tecnologias utilizadas
 
-Se o lançador `py -3.14` não estiver disponível, use `-PythonPath 'C:\caminho\para\python.exe'` no primeiro comando. Para desenvolvimento separado, inicie `uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000` pelo ambiente virtual na raiz e `npm.cmd run dev` em `frontend/`; o Vite encaminha `/api` para a porta 8000. A versão compilada é servida pelo FastAPI sem dois servidores.
+- **Frontend:** React 19, TypeScript, Vite 7 e Tailwind CSS 4; gráficos em SVG e testes com Vitest e Playwright.
+- **API:** Python 3.14, FastAPI, Pydantic e SQLAlchemy; testes com pytest e Ruff.
+- **Dados:** SQLite no início rápido local, PostgreSQL no ambiente Docker e migrations Alembic.
+- **Detecção:** Isolation Forest e regras estatísticas, avaliados separadamente e em união.
+- **Integrações opcionais:** Gemini API para investigação sob demanda e n8n Community para automação local. O modo padrão de notificação é `simulated`.
 
-## O que há no sistema
+## Arquitetura da aplicação
 
-- **Dashboard:** volume e saldo de transações aprovadas, taxa de aprovação, contagem de alertas, série temporal e distribuição por canal. Compara as métricas reais das três abordagens no teste sintético e mostra a última execução de automação registrada pela API. A seleção padrão é **regras**, por ter o maior F1 observado; a seleção também altera a lista de alertas e a contagem no período. As métricas são globais e não são recalculadas pelos filtros financeiros.
-- **Transações:** busca por referência, filtros de período, conta, canal e status, paginação e horários em UTC.
-- **Central de anomalias:** prioridade, score do Isolation Forest, motivos e valores observados; filtros por abordagem, prioridade e paginação. Regras, Isolation Forest e união permanecem disponíveis.
-- **Investigação:** evidências do grupo, maiores transações, histórico e geração sob demanda. Análises do Gemini e baseadas em regras têm identificação visual distinta. Sem chave Gemini, a análise local funciona por regras; respostas inválidas ou indisponibilidade geram fallback registrado. No modo público, uma prévia por regras não grava histórico.
-- **Automações:** seleção de alertas críticos detectados por regras, deduplicação por alerta e modo, registro de execução e tentativas. O modo padrão simula notificações e **não envia e-mails**. O modo público só permite consultar o fluxo e o histórico.
+O frontend em `frontend/` consulta a API FastAPI em `backend/`. A aplicação compilada é servida pelo próprio FastAPI; no desenvolvimento, o Vite encaminha `/api` para a porta 8000. `database/` guarda as migrations e o SQLite local ignorado pelo Git. `automation/` contém o workflow n8n exportável. A API usa filtros tipados, paginação e cabeçalhos de segurança.
 
-## Arquitetura e decisões
+No modo local, gravações exigem `X-Admin-Key`. Com `PUBLIC_DEMO=true`, as rotas administrativas e a consulta de alertas pendentes do n8n não são registradas. O navegador recebe somente dados sintéticos e pode solicitar uma prévia de investigação por regras, sem gravação nem chamada externa. Esse modo é uma vitrine de leitura; não substitui autenticação por usuário em um produto operacional. Use um worker no modo local.
 
-`frontend/` usa React 19, TypeScript, Vite e Tailwind CSS 4. A API em `backend/` usa FastAPI, SQLAlchemy e Pydantic. `database/` contém a migration Alembic e o SQLite local ignorado pelo Git. `automation/` contém o workflow n8n exportável. No modo local, as operações de gravação exigem `X-Admin-Key`. Com `PUBLIC_DEMO=true`, essas rotas e a consulta de pendências do n8n deixam de ser registradas; o navegador recebe somente dados sintéticos. A API aplica filtros tipados, paginação e cabeçalhos de segurança. Execute um worker no modo local. Esse modo público é uma vitrine de leitura, não substitui autenticação por usuário para um produto operacional.
+O PostgreSQL usa a mesma migration Alembic do SQLite. Para configurá-lo fora do Compose, defina `DATABASE_URL=postgresql+psycopg://usuario:senha@host:5432/banco` no `.env`, crie um banco vazio e execute `.\.venv\Scripts\python.exe -m backend.app.cli init`. Serviços gerenciados podem exigir TLS (`sslmode=require`); conexão externa e políticas do provedor ainda não foram testadas aqui. A URL do banco não vai para o frontend.
 
-A geração usa seed 42 e período fixo de janeiro a dezembro de 2025. O volume varia por dia da semana e estação, com perfis de conta e canal. São inseridas amostras rotuladas de valor extremo, horário incomum, referência duplicada, pico de volume e queda na aprovação. Os rótulos ficam em `synthetic_labels`, fora da tabela usada para features. `datasets.id` identifica versão, seed e contagem; repetir a carga/pipeline com os mesmos parâmetros retorna o resultado existente. Uma base incompatível ou incompleta é recusada, sem apagar registros.
+## Pipeline e dados sintéticos
 
-O detector agrega transações por conta, canal e dia, após o fechamento do dia. Medianas por conta/canal são ajustadas somente com janeiro a agosto. Isolation Forest e regras estatísticas são calculados separadamente; a união persiste todos os candidatos, sem descartar nenhum detector. **Regras é o filtro padrão de consulta e notificação** por ter o maior F1 nesta avaliação. Setembro a dezembro é o teste cronológico. Os rótulos entram **após** `fit`/`predict`, para calcular matriz de confusão, precisão, recall e F1. O score do modelo não é probabilidade de fraude. O pipeline persiste versão, features, corte temporal, métricas e evidências dos grupos sinalizados.
+A geração usa seed 42 e o período fixo de janeiro a dezembro de 2025. O volume varia por dia da semana e estação, com perfis de conta e canal. São injetados eventos rotulados de valor extremo, horário incomum, referência duplicada, pico de volume e queda na aprovação. Os rótulos ficam em `synthetic_labels`, fora da tabela usada para as features.
 
-### Resultado medido no dataset padrão
+`datasets.id` identifica versão, seed e contagem. Repetir a carga ou o pipeline com os mesmos parâmetros retorna o resultado existente; uma base incompatível ou incompleta é recusada sem apagar registros. O detector agrega transações por **conta/canal/dia**, após o fechamento do dia. As medianas por conta e canal são ajustadas somente com janeiro a agosto de 2025. Setembro a dezembro é o teste cronológico. Os rótulos entram após `fit` e `predict`, para calcular matriz de confusão, precisão, recall e F1. O pipeline persiste versão, features, corte temporal, métricas e evidências dos grupos sinalizados.
 
-Pipeline executado localmente com 50.000 transações, 7.197 grupos de treino e 3.543 de teste (554 positivos no teste). A unidade de avaliação é **conta/canal/dia**, e os positivos incluem eventos injetados; estes números não representam desempenho em dados reais.
+## Detecção de anomalias e resultados de Machine Learning
+
+Isolation Forest e regras estatísticas são calculados separadamente; a abordagem combinada reúne os candidatos dos dois detectores. As três abordagens permanecem disponíveis no dashboard e na central de anomalias. **Regras é a seleção padrão de consulta e notificação**, pois teve o maior F1 nesta avaliação sintética. A seleção do dashboard altera a contagem no período e os alertas exibidos, mas os filtros financeiros não recalculam as métricas globais de teste. O score do Isolation Forest não é probabilidade de fraude.
+
+Resultado medido no dataset padrão: 50.000 transações, 7.197 grupos de treino e 3.543 de teste, dos quais 554 são positivos. A unidade de avaliação é conta/canal/dia, e os positivos incluem eventos injetados. Estes números **não representam desempenho em dados reais**.
 
 | Detector | Precisão | Recall | F1 |
 | --- | ---: | ---: | ---: |
 | Isolation Forest | 0,7842 | 0,4134 | 0,5414 |
-| Regras | 0,8574 | 0,8574 | 0,8574 |
-| União | 0,8023 | 0,8718 | 0,8356 |
+| Regras | 0,8574 | 0,8574 | **0,8574** |
+| Abordagem combinada (união) | 0,8023 | 0,8718 | 0,8356 |
 
-Nesta seed, a união recupera mais positivos que cada detector isolado, mas as regras têm maior F1. A seleção padrão não é um ajuste de hiperparâmetros pelo conjunto de teste: o pipeline e as três abordagens permanecem fixos, e o dashboard informa a escolha baseada **apenas neste resultado sintético**. Não extrapole essa ordenação para dados reais. Métricas por tipo de evento e contagens da matriz de confusão estão em `GET /api/pipeline/runs`.
+Nesta seed, a união recuperou mais positivos, enquanto as regras tiveram maior F1. A escolha padrão é uma decisão de apresentação baseada apenas nesse resultado sintético; o pipeline e as três abordagens permanecem fixos, sem ajuste de hiperparâmetros no conjunto de teste. Não extrapole a ordenação para dados reais. Métricas por tipo de evento e contagens da matriz de confusão estão em `GET /api/pipeline/runs`.
 
-## Integrações opcionais
+## Integração com Gemini
 
-**Gemini:** somente no modo local, coloque `GEMINI_API_KEY` em `.env` e reinicie o servidor. `GEMINI_MODEL` é configurável (padrão `gemini-3.5-flash-lite`, com entrada e saída gratuitas no [plano Free](https://aistudio.google.com/docs/pricing#gemini-3-5-flash-lite)). Para atualizar um banco já criado, rode `.\.venv\Scripts\python.exe -m backend.app.cli migrate`. A ação explícita na página de investigação envia apenas dia, severidade, motivos e evidências agregadas. O retorno JSON é validado e guardado com provedor e modelo; chave ausente, erro HTTP, timeout, falha de conexão ou resposta inválida resultam em análise por regras. Cada chamada real gera um registro interno em `gemini_attempts` com modelo solicitado, horário UTC, status HTTP, código e categoria do erro, sem mensagem ou payload do provedor. Esses diagnósticos não são servidos pela API pública. O modo público recusa a chave e oferece somente a prévia local por regras. Confirme no AI Studio que o projeto está na camada gratuita antes de testar; não envie a chave pelo chat.
+No modo local, defina `GEMINI_API_KEY` no `.env` e reinicie o servidor. `GEMINI_MODEL` permite selecionar o modelo; o padrão verificado é `gemini-3.5-flash-lite`. Confira no AI Studio a disponibilidade da camada gratuita para seu projeto antes de fazer uma chamada. Para migrar um banco já criado, execute `.\.venv\Scripts\python.exe -m backend.app.cli migrate`. A chave permanece no backend e nunca deve ser enviada pelo chat, colocada no frontend ou versionada.
 
-Em 18/11/2026, uma tentativa com `gemini-2.5-flash` terminou no fallback por regras; a versão anterior descartou o erro externo, então sua causa exata não pode ser recuperada. A [documentação dos modelos](https://aistudio.google.com/docs/models) limita o acesso à família 2.5 a usuários anteriores; o HTTP 200 da consulta de metadados não comprovava acesso à geração. Após a mudança para `gemini-3.5-flash-lite`, **uma** geração real da anomalia sintética 1 foi concluída (HTTP 200) e salva no histórico como `gemini` / `gemini-3.5-flash-lite`. A resposta continha resumo, evidências numéricas conferidas com o banco, hipóteses, recomendações e limitações. Esse único sucesso não demonstra disponibilidade contínua nem desempenho em dados reais.
+A ação explícita na página de investigação envia ao Gemini somente dia, severidade, motivos e evidências agregadas. O JSON retornado é validado e salvo com provedor e modelo. Chave ausente, erro HTTP, timeout, falha de conexão ou resposta inválida produzem análise por regras, identificada visualmente como **sem IA generativa**. Cada tentativa real gera um diagnóstico interno em `gemini_attempts` com modelo solicitado, horário UTC, status HTTP, código e categoria do erro, sem mensagem ou payload do provedor. Esses diagnósticos não são servidos pela API pública; o modo público recusa chamadas ao Gemini.
 
-**PostgreSQL:** configure `DATABASE_URL=postgresql+psycopg://usuario:senha@host:5432/banco` em `.env`, crie um banco vazio e rode `.\.venv\Scripts\python.exe -m backend.app.cli init`. A migration é a mesma para PostgreSQL local ou gerenciado; serviços externos podem exigir TLS (`sslmode=require`). Conexão externa e políticas do provedor dependem do ambiente e ainda não foram testadas aqui. Não exponha essa URL no frontend.
+Em 18/11/2026, uma tentativa com `gemini-2.5-flash` terminou em fallback. A implementação anterior descartava o erro externo, portanto a causa exata daquela tentativa não pode ser recuperada; HTTP 200 na consulta de metadados não comprovava acesso à geração. Após a mudança para `gemini-3.5-flash-lite`, **uma geração real** da anomalia sintética 1 foi concluída com HTTP 200 e salva no histórico como `gemini` / `gemini-3.5-flash-lite`. A resposta continha resumo, evidências numéricas conferidas com o banco, hipóteses, recomendações e limitações. Esse único sucesso não demonstra disponibilidade contínua nem desempenho em dados reais. Consulte a [documentação dos modelos](https://aistudio.google.com/docs/models) e a [tabela de preços do AI Studio](https://aistudio.google.com/docs/pricing#gemini-3-5-flash-lite) antes de repetir o teste.
 
-**Docker Compose e n8n Community:** o ambiente local foi validado com Docker Engine 29.9.3, Compose 5.7.0 e n8n 2.48.5. Depois de configurar `.env`, confirme `NOTIFICATION_MODE=simulated` e execute:
+## Automações com n8n e Docker
+
+O workflow em `automation/critical-alerts.n8n.json` consulta até 100 alertas críticos detectados por regras e ainda pendentes, deduplica o lote e chama o backend. A API confirma a idempotência no banco e registra execução, resultado e tentativa. A chave administrativa fica em uma credencial **Header Auth** do n8n para `X-Admin-Key`, não no JSON exportado.
+
+O ambiente local foi verificado com Docker Engine 29.9.3, Docker Compose 5.7.0 e n8n Community 2.48.5. Com `.env` configurado e `NOTIFICATION_MODE=simulated`, valide e inicie somente os serviços necessários:
 
 ```powershell
 docker compose --profile automation config --quiet
 docker compose --profile automation up -d --build postgres app n8n
 ```
 
-O app integrado fica em <http://127.0.0.1:8000> e n8n em <http://localhost:5678>. O workflow existente foi importado no n8n local pelo CLI e associado a uma credencial **Header Auth** para `X-Admin-Key`, armazenada no n8n; a chave não está no JSON exportado. O fluxo busca até 100 críticos detectados por regras e ainda pendentes, deduplica o lote e chama o backend, que confirma idempotência no banco e registra resultado e tentativa. Três execuções reais no n8n processaram 100, 41 e 0 alertas, respectivamente: **141 notificações simuladas, 141 alertas distintos e nenhuma duplicata**. O agendamento segue inativo. Veja o [guia de instalação e resultados verificados](docs/n8n-local.md).
+O app fica em <http://127.0.0.1:8000> e o n8n em <http://localhost:5678>. O workflow foi importado no n8n local pelo CLI e executado três vezes: 100, 41 e 0 alertas processados. O backend registrou **141 notificações simuladas, 141 alertas distintos e nenhuma duplicata**. Não houve envio de e-mail; o agendamento segue inativo. O [guia de instalação e resultados verificados](docs/n8n-local.md) registra a configuração e a execução.
 
-**SMTP:** altere `NOTIFICATION_MODE=smtp` e configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_TO` e, se necessário, `SMTP_USER`/`SMTP_PASSWORD`. O envio usa STARTTLS. Falhas antes do envio podem ser tentadas até três vezes; falha durante SMTP vira `unknown` e exige revisão manual antes de qualquer reenvio, pois a entrega pode ter ocorrido. A idempotência é por alerta e modo. O modo padrão é `simulated`.
+O envio SMTP é opcional. Ele exige `NOTIFICATION_MODE=smtp`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_TO` e, se necessário, `SMTP_USER`/`SMTP_PASSWORD`; usa STARTTLS. Falhas anteriores ao envio podem ser tentadas até três vezes. Uma falha durante SMTP vira `unknown` e exige revisão manual antes de reenviar, pois a entrega pode ter ocorrido. A idempotência é por alerta e modo. **Nenhum e-mail real foi enviado nesta validação.**
 
-## Demonstração pública
+## Cinco páginas da aplicação
 
-O modo `PUBLIC_DEMO=true` mantém somente consultas e uma prévia de investigação por regras. Os dados devem continuar sintéticos; não coloque chaves, credenciais ou dados reais nesse ambiente. A estratégia gratuita proposta é um serviço Docker no Render com frontend e API no mesmo domínio e PostgreSQL Free no Neon. **Nenhum deploy foi realizado.** O [guia de publicação futura](docs/public-demo.md) descreve a preparação do banco, a configuração segura e os limites dos planos gratuitos.
+As capturas integrais abaixo foram feitas com Playwright em viewport desktop de 1440 × 900, após carregar a API. O servidor de teste usa uma cópia isolada do SQLite, dados sintéticos e `PUBLIC_DEMO=true`. Por isso, a investigação mostra uma prévia por regras e o histórico de automações nessa cópia está vazio; as execuções n8n descritas acima foram registradas no PostgreSQL local.
 
-## Capturas das cinco telas
+### Dashboard
 
-Capturas integrais feitas com Playwright em viewport desktop de 1440 × 900, após o carregamento da API. O servidor de teste usa uma cópia isolada do SQLite, dados sintéticos e `PUBLIC_DEMO=true`. Por isso, a investigação mostra a prévia baseada em regras e o histórico de automações dessa cópia está vazio; as execuções n8n descritas acima foram registradas no PostgreSQL local.
+Indicadores de volume aprovado, saldo, aprovação e anomalias; comparação dos três detectores, série temporal, canais, alertas prioritários e a última execução de automação registrada pela API.
 
-### Visão geral
-
-![Dashboard com indicadores, comparação dos detectores e fluxo financeiro](docs/images/01-dashboard.png)
+![Dashboard com indicadores, comparação dos detectores, gráfico e alertas](docs/images/01-dashboard.png)
 
 ### Transações
 
-![Livro de movimentações com transações sintéticas carregadas](docs/images/02-transacoes.png)
+Livro de movimentações com busca por referência, filtros de período, conta, canal e status, paginação e horários sintéticos em UTC. A tabela mantém rolagem própria em telas estreitas.
+
+![Tabela de transações sintéticas com busca e filtros](docs/images/02-transacoes.png)
 
 ### Central de anomalias
 
-![Fila de anomalias com prioridades e evidências dos detectores](docs/images/03-anomalias.png)
+Fila com prioridade, score do Isolation Forest, motivos e valores observados. Permite filtrar por detector e prioridade e abrir cada alerta para investigação.
+
+![Fila de anomalias com prioridades e detectores](docs/images/03-anomalias.png)
 
 ### Investigação com IA
 
-![Evidências de um alerta sintético e prévia de análise baseada em regras](docs/images/04-investigacao-ia.png)
+Evidências e análise aparecem lado a lado no desktop e empilhadas no celular. A página mostra maiores transações, histórico e geração sob demanda; análises do Gemini e baseadas em regras têm identificações distintas.
+
+![Evidências de alerta sintético e prévia de análise por regras](docs/images/04-investigacao-ia.png)
 
 ### Automações
 
+Mostra o fluxo de consulta, deduplicação, notificação e registro, além do histórico de execuções e tentativas. No modo público, as operações de escrita não ficam disponíveis.
+
 ![Fluxo de notificações simuladas e histórico da cópia isolada](docs/images/05-automacoes.png)
 
-## Qualidade e comandos úteis
+## Estrutura do repositório
+
+```text
+backend/              API, geração sintética, detecção, investigação e testes
+frontend/             React, estilos, testes unitários e Playwright
+database/migrations/  versões Alembic
+automation/           workflow n8n exportável
+docs/                 guias e capturas reais das cinco telas
+scripts/              preparação, inicialização e verificação de navegador
+docker-compose.yml    serviços locais PostgreSQL, app e n8n
+Dockerfile            imagem da aplicação integrada
+```
+
+O SQLite local, `.env`, logs, capturas temporárias e artefatos de build são ignorados pelo Git.
+
+## Como executar localmente
+
+No Windows, use Python 3.14, Node.js 24 e npm 11. A preparação instala dependências no projeto, cria `.env` local com chaves aleatórias, aplica a migration, carrega a base uma vez, executa o pipeline e compila o frontend. A primeira execução processa 50.000 transações e pode levar alguns minutos.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1
+```
+
+Abra <http://127.0.0.1:8000>; a documentação OpenAPI está em <http://127.0.0.1:8000/docs>. Para gerar análises, reexecutar o pipeline ou simular notificações no ambiente local, abra **Acesso administrativo** e use `FINOPS_ADMIN_KEY` do `.env` local. A interface mantém a chave apenas na memória da aba. Não compartilhe nem versione esse arquivo.
+
+Se `py -3.14` não estiver disponível, passe `-PythonPath 'C:\caminho\para\python.exe'` ao primeiro comando. Para executar frontend e backend separadamente, inicie `uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000` pelo ambiente virtual da raiz e `npm.cmd run dev` em `frontend/`. O Vite encaminha `/api` à porta 8000.
+
+Para uma futura demonstração online, `PUBLIC_DEMO=true` mantém somente leitura e prévia por regras. A estratégia gratuita proposta é um serviço Docker no Render com frontend e API no mesmo domínio e PostgreSQL Free no Neon. **Nenhum deploy foi realizado nesta etapa.** Veja o [guia de publicação futura](docs/public-demo.md), incluindo configuração segura e limites dos planos gratuitos. Não coloque chaves, credenciais ou dados reais no ambiente público.
+
+## Testes, limitações e próximos passos
+
+Comandos de validação:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
@@ -105,9 +148,12 @@ Pop-Location
 .\.venv\Scripts\python.exe scripts\verify_browser.py
 ```
 
-O teste de navegador usa uma cópia descartável do SQLite, servidor local na porta 8001 e uma chave exclusivamente de teste. Capturas integrais ficam em `artifacts/` e são ignoradas pelo Git. Para repetir as duas verificações públicas, execute `$env:PUBLIC_DEMO='true'; .\.venv\Scripts\python.exe scripts\verify_browser.py public-demo.spec.ts` em um novo PowerShell. O navegador testa as cinco telas em desktop e mobile, filtros, paginação, investigação por regras, estado vazio, recuperação de falha de API e ausência de ações administrativas no modo público. A validação em aparelho físico, SMTP real e PostgreSQL gerenciado permanece pendente. `npm audit` aponta uma vulnerabilidade alta de ReDoS em `picomatch`, presente apenas nas ferramentas de desenvolvimento; ainda não havia correção na [advisory consultada](https://github.com/advisories/GHSA-fc5q-39xc-vjpf). O build estático gerado não inclui essa dependência. Verifique um patch antes de atualizar ou expor ferramentas de build a padrões glob de origem não confiável.
+O teste de navegador usa cópia descartável do SQLite, servidor local na porta 8001 e chave exclusivamente de teste. Capturas temporárias ficam em `artifacts/`, ignorado pelo Git. Para verificar o modo público, execute `$env:PUBLIC_DEMO='true'; .\.venv\Scripts\python.exe scripts\verify_browser.py public-demo.spec.ts` em um novo PowerShell. O navegador cobre as cinco páginas, filtros, paginação, investigação por regras, estado vazio, recuperação de falha de API e ausência de ações administrativas públicas.
 
-Validação local em 18/11/2026: **52 testes pytest** e **7 testes Vitest** passaram; typecheck, ESLint, Ruff e a compilação do frontend também passaram. A validação anterior incluiu seis fluxos Playwright (quatro locais e dois públicos). Nesta rodada, Docker Compose iniciou PostgreSQL, FastAPI e n8n; o workflow foi importado e executado três vezes no n8n, com **141 notificações simuladas, 141 alertas distintos, 141 tentativas e zero falhas de entrega**. Uma quarta tentativa inicial do CLI falhou por conflito na porta interna do task broker, antes de chamar o backend; a execução com portas internas exclusivas funcionou. Chrome confirmou os registros na página Automações e o resumo na página inicial sem erro no console. O agendamento não foi ativado. Na auditoria anterior, `npm audit --omit=dev` e `pip-audit` sobre `backend/requirements.lock.txt` retornaram zero vulnerabilidades; o audit completo do npm apontou entradas altas encadeadas a `picomatch` nas dependências de desenvolvimento. Não houve validação em dispositivo móvel físico nem PostgreSQL gerenciado.
+Na validação de 18/11/2026, passaram **52 testes pytest**, **7 testes Vitest**, typecheck, ESLint, Ruff, build e seis fluxos Playwright (quatro locais e dois públicos). Docker Compose iniciou PostgreSQL, FastAPI e n8n. O workflow foi importado e executado três vezes no n8n, com 141 notificações simuladas, 141 alertas distintos, 141 tentativas e zero falhas de entrega. Uma tentativa inicial do CLI falhou por conflito na porta interna do task broker antes de chamar o backend; a execução com portas internas exclusivas funcionou. O Chrome confirmou registros na página de Automações e resumo no dashboard sem erro de console. O agendamento não foi ativado.
 
-O dataset é demonstrativo, não contém dados financeiros reais e não oferece decisão automática ou aconselhamento financeiro. O corte temporal e as regras foram escolhidos para a simulação; métricas podem mudar com seed, versão do algoritmo ou dependências.
+Depois do redesign, o frontend passou novamente por typecheck, ESLint, 7 testes Vitest e build. O Playwright gerou as cinco capturas públicas reais e verificou as páginas em larguras de 1440, 1366, 768 e 390 px, sem erro de console ou overflow horizontal da página. A validação ainda não inclui aparelho móvel físico, SMTP real ou PostgreSQL gerenciado.
 
+Na auditoria anterior, `npm audit --omit=dev` e `pip-audit` sobre `backend/requirements.lock.txt` retornaram zero vulnerabilidades. O audit completo do npm apontou uma vulnerabilidade alta de ReDoS em `picomatch` nas ferramentas de desenvolvimento; ainda não havia correção na [advisory consultada](https://github.com/advisories/GHSA-fc5q-39xc-vjpf). O build estático não inclui essa dependência. Verifique um patch antes de atualizar ou expor ferramentas de build a padrões glob de origem não confiável.
+
+O dataset é demonstrativo: não contém dados financeiros reais e não oferece decisão automática ou aconselhamento financeiro. O corte temporal e as regras foram escolhidos para a simulação; métricas podem mudar com seed, algoritmo ou dependências. Os próximos passos dependem de um ambiente de hospedagem configurado e de validação em dispositivo físico, sem expor operações administrativas.
