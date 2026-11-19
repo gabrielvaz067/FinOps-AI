@@ -1,0 +1,22 @@
+{
+  "name": "FinOps AI — alertas críticos sintéticos",
+  "active": false,
+  "nodes": [
+    {"parameters": {"rule": {"interval": [{"field": "minutes", "minutesInterval": 5}]}}, "id": "schedule", "name": "A cada 5 minutos", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0, 0]},
+    {"parameters": {}, "id": "manual", "name": "Executar manualmente", "type": "n8n-nodes-base.manualTrigger", "typeVersion": 1, "position": [0, 200]},
+    {"parameters": {"url": "http://app:8000/api/automations/pending", "options": {"timeout": 30000}}, "id": "query", "name": "Consultar críticos pendentes", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [240, 100], "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 5000},
+    {"parameters": {"jsCode": "const rows = $input.first().json.items ?? [];\nconst ids = [...new Set(rows.filter(row => row.severity === 'critical').map(row => row.id))];\nreturn ids.length ? [{json: {anomaly_ids: ids.slice(0, 100)}}] : [];"}, "id": "dedupe", "name": "Deduplicar lote", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [490, 100]},
+    {"parameters": {"method": "POST", "url": "http://app:8000/api/automations/run", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendBody": true, "specifyBody": "json", "jsonBody": "={{ JSON.stringify($json) }}", "options": {"timeout": 120000}}, "id": "notify", "name": "Notificar e registrar no FinOps", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [740, 100], "retryOnFail": true, "maxTries": 3, "waitBetweenTries": 10000},
+    {"parameters": {"jsCode": "const run = $input.first().json;\nreturn [{json: {run_id: run.id, status: run.status, mode: run.mode, processed: run.processed, failed: run.failed, persisted_in: 'automation_runs + notification_attempts', note: run.mode === 'simulated' ? 'Nenhum e-mail enviado.' : 'Consultar resultados de entrega no FinOps.'}}];"}, "id": "result", "name": "Resultado auditável", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1000, 100]}
+  ],
+  "connections": {
+    "A cada 5 minutos": {"main": [[{"node": "Consultar críticos pendentes", "type": "main", "index": 0}]]},
+    "Executar manualmente": {"main": [[{"node": "Consultar críticos pendentes", "type": "main", "index": 0}]]},
+    "Consultar críticos pendentes": {"main": [[{"node": "Deduplicar lote", "type": "main", "index": 0}]]},
+    "Deduplicar lote": {"main": [[{"node": "Notificar e registrar no FinOps", "type": "main", "index": 0}]]},
+    "Notificar e registrar no FinOps": {"main": [[{"node": "Resultado auditável", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1", "timezone": "America/Sao_Paulo", "saveDataErrorExecution": "all", "saveDataSuccessExecution": "all"},
+  "pinData": {},
+  "tags": []
+}

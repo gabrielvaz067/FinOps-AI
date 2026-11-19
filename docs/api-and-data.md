@@ -1,0 +1,11 @@
+# Contratos e dados
+
+O prefixo público é `/api`. `GET /health`, `/options`, `/summary`, `/series`, `/channels`, `/transactions`, `/anomalies`, `/anomalies/{id}`, `/anomalies/{id}/analyses`, `/pipeline/runs`, `/automations` e `/automations/pending` servem dados sintéticos. `POST /pipeline/run`, `/anomalies/{id}/investigate` e `/automations/run` exigem o cabeçalho `X-Admin-Key`. Todos os POSTs usam JSON; a análise aceita `{"provider":"rules"}` ou `{"provider":"gemini"}`, e a automação aceita `{"anomaly_ids":[1,2]}` ou `{}` para o lote pendente.
+
+Filtros comuns: `start`, `end` (datas inclusivas `YYYY-MM-DD`), `account_id` e `channel_id`. Transações também aceitam `status` e `search`; anomalias aceitam `severity` e `detector`. Listas têm `page` e `page_size` com máximo 100. Um filtro inválido retorna 422; recurso ausente, 404; chave incorreta, 401; concorrência/estado incompatível, 409; limite administrativo, 429. O banco deve ser inicializado antes de chamar endpoints de dados.
+
+O PostgreSQL e o SQLite usam os mesmos modelos e migrations. Índices cobrem data/status das transações, conta/canal/data e prioridade/data dos alertas. Chaves estrangeiras unem contas, canais, transações, rótulos, execuções de pipeline, alertas, análises, automações e tentativas. Valores monetários são inteiros em centavos na persistência e na API; o frontend converte apenas para apresentação. Horários são UTC sem informação de fuso no SQLite; não misture estes dados sintéticos com timestamps locais.
+
+O limite do detector é intencional: um grupo observado no mesmo dia só é conhecido após seu fechamento. `duplicate_rate` usa referências já vistas em ordem cronológica; o primeiro pagamento não é marcado retroativamente. Rótulos não são consultados na detecção. A avaliação mede grupos que contêm eventos injetados, o que inclui alguns grupos com tráfego normal misturado. Não interpreta alertas como fraude.
+
+Notificações têm unicidade `(anomaly_id, mode)` e tentativas relacionadas a uma execução. Em SMTP, `sending` e `unknown` não são retomados automaticamente: entrega exatamente uma vez não pode ser comprovada após uma falha de rede. Operação manual é necessária para conciliar o provedor de e-mail. Executar uma simulação e depois ativar SMTP cria registros independentes por modo.
