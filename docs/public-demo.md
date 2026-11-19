@@ -1,6 +1,6 @@
-# Publicação futura: Netlify, Render e Neon
+# Demonstração online: Netlify, Render e Neon
 
-Este guia prepara uma demonstração com **dados exclusivamente sintéticos**. Nenhum serviço online foi criado ou testado neste projeto. O frontend estático ficará no Netlify; a API FastAPI, no Render Free; e o PostgreSQL, no Neon Free. O Docker Compose e o n8n continuam restritos ao ambiente local.
+A demonstração online foi publicada e conferida em 19/11/2026, com dados exclusivamente sintéticos. **Aplicação:** https://finops-ai-monitor.netlify.app/ · **API:** https://finops-ai-api.onrender.com · **OpenAPI:** https://finops-ai-api.onrender.com/docs. O frontend está no Netlify; a API FastAPI roda no Render Free; o PostgreSQL 17 está no Neon Free. O Docker Compose e o n8n continuam restritos ao ambiente local. Este guia também documenta como reproduzir o deploy.
 
 ## 1. Preparar o banco no Neon
 
